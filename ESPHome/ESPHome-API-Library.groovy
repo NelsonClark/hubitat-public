@@ -157,6 +157,35 @@ void espHomeFanCommand(Map<String, Object> tags) {
 }
 
 @CompileStatic
+void espHomeClimateCommand(Map<String, Object> tags) {
+    sendMessage(MSG_CLIMATE_COMMAND_REQUEST, [
+            1: [ tags.key as Integer, WIRETYPE_FIXED32 ],
+            2: [ tags.mode != null ? 1 : 0, WIRETYPE_VARINT ],
+            3: [ tags.mode as Integer, WIRETYPE_FIXED32 ],
+            4: [ tags.targetTemperature != null ? 1 : 0, WIRETYPE_VARINT ],
+            5: [ tags.targetTemperature as Float, WIRETYPE_FIXED32 ],
+            6: [ tags.targetTemperatureLow != null ? 1 : 0, WIRETYPE_VARINT ],
+            7: [ tags.targetTemperatureLow as Float, WIRETYPE_FIXED32 ],
+            8: [ tags.targetTemperatureHigh != null ? 1 : 0, WIRETYPE_VARINT ],
+            9: [ tags.targetTemperatureHigh as Float, WIRETYPE_FIXED32 ],
+            10: [ tags.unusedLegacyAway != null ? 1 : 0, WIRETYPE_VARINT ], // deprecated
+            11: [ tags.unusedLegacyAway ? 1 : 0, WIRETYPE_VARINT ], // deprecated
+            12: [ tags.fanMode != null ? 1 : 0, WIRETYPE_VARINT ],
+            13: [ tags.fanMode as Integer, WIRETYPE_VARINT ],
+            14: [ tags.swingMode != null ? 1 : 0, WIRETYPE_VARINT ],
+            15: [ tags.swingMode as Integer, WIRETYPE_FIXED32 ],
+            16: [ tags.customFanMode != null ? 1 : 0, WIRETYPE_VARINT ],
+            17: [ tags.customFanMode as String, WIRETYPE_LENGTH_DELIMITED ],
+            18: [ tags.preset != null ? 1 : 0, WIRETYPE_VARINT ],
+            19: [ tags.preset as Integer, WIRETYPE_FIXED32 ],
+            20: [ tags.customPreset != null ? 1 : 0, WIRETYPE_VARINT ],
+            21: [ tags.customPreset as String, WIRETYPE_LENGTH_DELIMITED ],
+            22: [ tags.targetHumidity != null ? 1 : 0, WIRETYPE_VARINT ],
+            23: [ tags.targetHumidity as Float, WIRETYPE_FIXED32 ]
+    ], MSG_CLIMATE_STATE_RESPONSE)
+}
+
+@CompileStatic
 void espHomeLightCommand(Map<String, Object> tags) {
     sendMessage(MSG_LIGHT_COMMAND_REQUEST, [
             1: [ tags.key as Integer, WIRETYPE_FIXED32 ],
@@ -214,14 +243,6 @@ void espHomeNumberCommand(Map<String, Object> tags) {
             1: [ tags.key as Integer, WIRETYPE_FIXED32 ],
             2: [ tags.state as Float, WIRETYPE_FIXED32 ]
     ])
-}
-
-@CompileStatic
-void espHomeSelectCommand(Map<String, Object> tags) {
-    sendMessage(MSG_SELECT_COMMAND_REQUEST, [
-            1: [tags.key as Integer, WIRETYPE_FIXED32 ],
-            2: [tags.state as String, WIRETYPE_LENGTH_DELIMITED ]
-    ], MSG_SELECT_STATE_RESPONSE)
 }
 
 @CompileStatic
@@ -497,6 +518,59 @@ private static Map espHomeCoverState(Map<Integer, List> tags, boolean isDigital)
 }
 
 @CompileStatic
+private static Map espHomeListEntitiesClimate(Map<Integer, List> tags) {
+    return parseEntity(tags) + [
+            type: 'entity',
+            platform: 'climate',
+            supportsCurrentTemperature: getBooleanTag(tags, 5),
+        	supportsTwoPointTargetTemperature: getBooleanTag(tags, 6),
+        	supportedModes: getIntTagList(tags, 7), // 7 SENDS NUMERICAL VALUES
+        	visualMinTemperature: getFloatTag(tags, 8),
+        	visualMaxTemperature: getFloatTag(tags, 9),
+        	visualTargetTemperatureStep: getFloatTag(tags, 10),
+        	supportsAway: getBooleanTag(tags, 11), // Deprecated in API 1.5
+        	supportsAction: getBooleanTag(tags, 12),
+        	supportedFanModes: getIntTagList(tags, 13), // 13 SENDS NUMERICAL VALUES
+        	supportedSwingModes: getIntTagList(tags, 14), // 14 SENDS NUMERICAL VALUES
+        	supportedCustomFanModes: getStringTagList(tags, 15), // 15 OK
+        	supportedPresets: getIntTagList(tags, 15), // 16 SENDS NUMERICAL VALUES
+        	supportedCustomPresets: getStringTagList(tags, 17), // 17 OK
+        	disabledByDefault: getBooleanTag(tags, 18),
+        	icon: getStringTag(tags, 19),
+            entityCategory: toEntityCategory(getIntTag(tags, 20)),
+        	visualCurrentTemperature_step: getFloatTag(tags, 21),
+        	supportsCurrentHumidity: getBooleanTag(tags, 22),
+        	supportsTargetHumidity: getBooleanTag(tags, 23),
+        	visualMinHumidity: getFloatTag(tags, 24),
+        	visualMaxHumidity: getFloatTag(tags, 25)
+	]
+}
+
+@CompileStatic
+private static Map espHomeClimateState(Map<Integer, List> tags) {
+    return [
+            type: 'state',
+            platform: 'climate',
+            key: getLongTag(tags, 1),
+        	mode: getIntTag(tags,2), //climatemode
+            current_temperature: getFloatTag(tags, 3),
+			target_temperature: getFloatTag(tags, 4),
+        	target_temperature_low: getFloatTag(tags, 5),
+        	target_temperature_high: getFloatTag(tags, 6),
+			unused_legacy_away: getBooleanTag(tags,7), //legacy: deprecated in API version 1.5
+        	action: getIntTag(tags,8), //ClimateAction
+        	fan_mode: getIntTag(tags,9), //ClimateFanMode
+        	swing_mode: getIntTag(tags,10), //ClimateSwingMode
+        	custom_fan_mode: getStringTag(tags,11),
+        	preset: getIntTag(tags,12), //ClimatePreset
+        	custom_preset: getStringTag(tags,13),
+        	current_humidity: getFloatTag(tags, 14),
+        	target_humidity: getFloatTag(tags, 15)
+    ]
+}
+
+
+@CompileStatic
 private static Map espHomeFanState(Map<Integer, List> tags, boolean isDigital) {
     return [
             type: 'state',
@@ -551,7 +625,6 @@ private static Map espHomeListEntitiesBinarySensorResponse(Map<Integer, List> ta
     return parseEntity(tags) + [
             type: 'entity',
             platform: 'binary',
-            deviceClass: getStringTag(tags, 5),
             isStatusBinarySensor: getBooleanTag(tags, 6),
             disabledByDefault: getBooleanTag(tags, 7),
             icon: getStringTag(tags, 8),
@@ -963,6 +1036,20 @@ private static String toEntityCategory(int value) {
     }
 }
 
+/*****************************************************************************************************/
+@CompileStatic
+private static String toClimateSupportedModes(int capability) {
+    switch (capability) {
+    	case CLIMATE_MODE_OFF: return 'off'
+    	case CLIMATE_MODE_HEAT_COOL: return 'heat cool'
+    	case CLIMATE_MODE_COOL: return 'cool'
+    	case CLIMATE_MODE_HEAT: return 'heat'
+    	case CLIMATE_MODE_FAN_ONLY: return 'fan only'
+    	case CLIMATE_MODE_DRY : return 'dry'
+    	case CLIMATE_MODE_AUTO: return 'auto'
+    }
+}
+
 @CompileStatic
 private static List<String> toCapabilities(int capability) {
     List<String> capabilities = []
@@ -1093,6 +1180,12 @@ private void parseMessage(ByteArrayInputStream stream, long length) {
         case MSG_SELECT_STATE_RESPONSE:
             parse espHomeSelectState(tags)
             break
+        case MSG_LIST_CLIMATE_RESPONSE:
+            parse espHomeListEntitiesClimate(tags)
+            break
+        case MSG_CLIMATE_STATE_RESPONSE:
+            parse espHomeClimateState(tags)
+            break
         default:
             if (!handled) {
                 logWarning "ESPHome received unhandled message type ${msgType} with ${tags}"
@@ -1102,13 +1195,56 @@ private void parseMessage(ByteArrayInputStream stream, long length) {
     espHomeSchedulePing()
 }
 
+//private void espHomeConnectRequest(String password = null) {
+//    // Message sent after the hello response to authenticate the client
+//    // Can only be sent by the client and only at the beginning of the connection
+//    log.info "ESPHome sending connect request (${password ? 'using' : 'no'} password)"
+//    sendMessage(MSG_CONNECT_REQUEST, [
+//            1: [ password as String, WIRETYPE_LENGTH_DELIMITED ]
+//    ], MSG_CONNECT_RESPONSE, 'espHomeConnectResponse')
+//}
+
 private void espHomeConnectRequest(String password = null) {
-    // Message sent after the hello response to authenticate the client
-    // Can only be sent by the client and only at the beginning of the connection
-    log.info "ESPHome sending connect request (${password ? 'using' : 'no'} password)"
-    sendMessage(MSG_CONNECT_REQUEST, [
-            1: [ password as String, WIRETYPE_LENGTH_DELIMITED ]
-    ], MSG_CONNECT_RESPONSE, 'espHomeConnectResponse')
+    //
+    // ESPHome API handshake rules:
+    // - Old ESPHome (API <= 1.11) sends ConnectResponse (type 4).
+    //   → We must wait for it.
+    //
+    // - New ESPHome (API >= 1.12 / ESPHome 2024.12+) does NOT send type 4.
+    //   → We must NOT wait for it or the connection will stall.
+    //
+    // Version values come from HELLO_RESPONSE (msg type 2).
+    //
+
+    boolean havePassword = (password != null && password != '')
+    log.info "ESPHome sending connect request (${havePassword ? 'using' : 'no'} password)"
+
+    // Build ConnectRequest tags: only field 1 (password) is valid.
+    Map<Integer, List> tags = [:]
+    if (havePassword) {
+        tags[1] = [ password as String, WIRETYPE_LENGTH_DELIMITED ]
+    }
+
+    // Determine whether we're talking to old or new API
+    boolean oldApi = false
+    if (state.apiVersionMajor != null && state.apiVersionMinor != null) {
+        oldApi = (state.apiVersionMajor < 1 ||
+                 (state.apiVersionMajor == 1 && state.apiVersionMinor <= 11))
+    }
+
+    if (oldApi) {
+        // Old ESPHome requires ConnectResponse
+        sendMessage(
+            MSG_CONNECT_REQUEST,
+            tags,
+            MSG_CONNECT_RESPONSE,
+            'espHomeConnectResponse'
+        )
+    } else {
+        // New ESPHome does not send ConnectResponse — continue handshake immediately
+        sendMessage(MSG_CONNECT_REQUEST, tags)
+        runInMillis(10, 'espHomeDeviceInfoRequest')
+    }
 }
 
 /* groovylint-disable-next-line UnusedPrivateMethod */
@@ -1157,7 +1293,7 @@ private void espHomeDeviceInfoResponse(Map<Integer, List> tags) {
         (device.getDataValue('MAC Address') != deviceInfo.macAddress)
 
     device.with {
-        updateDataValue 'Board Model', deviceInfo.boardModel
+//        updateDataValue 'Board Model', deviceInfo.board   //Model was duplicated
         updateDataValue 'Board Model', deviceInfo.boardModel
         updateDataValue 'Compile Time', deviceInfo.compileTime
         updateDataValue 'ESPHome Version', deviceInfo.espHomeVersion
@@ -1537,15 +1673,15 @@ private void logWarning(String s) {
 @Field static final int MSG_LIST_CAMERA_RESPONSE = 43
 @Field static final int MSG_CAMERA_IMAGE_RESPONSE = 44
 @Field static final int MSG_CAMERA_IMAGE_REQUEST = 45
-@Field static final int MSG_LIST_CLIMATE_RESPONSE = 46 // TODO
-@Field static final int MSG_CLIMATE_STATE_RESPONSE = 47 // TODO
+@Field static final int MSG_LIST_CLIMATE_RESPONSE = 46 // DONE
+@Field static final int MSG_CLIMATE_STATE_RESPONSE = 47 // DONE
 @Field static final int MSG_CLIMATE_COMMAND_REQUEST = 48 // TODO
 @Field static final int MSG_LIST_NUMBER_RESPONSE = 49
 @Field static final int MSG_NUMBER_STATE_RESPONSE = 50
 @Field static final int MSG_NUMBER_COMMAND_REQUEST = 51
 @Field static final int MSG_LIST_SELECT_RESPONSE = 52
-@Field static final int MSG_SELECT_STATE_RESPONSE = 53
-@Field static final int MSG_SELECT_COMMAND_REQUEST = 54
+@Field static final int MSG_SELECT_STATE_RESPONSE = 53 // TODO
+@Field static final int MSG_SELECT_COMMAND_REQUEST = 54 // TODO
 @Field static final int MSG_LIST_SIREN_RESPONSE = 55
 @Field static final int MSG_SIREN_STATE_RESPONSE = 56
 @Field static final int MSG_SIREN_COMMAND_REQUEST = 57
@@ -1554,7 +1690,7 @@ private void logWarning(String s) {
 @Field static final int MSG_LOCK_COMMAND_REQUEST = 60
 @Field static final int MSG_LIST_BUTTON_RESPONSE = 61
 @Field static final int MSG_BUTTON_COMMAND_REQUEST = 62
-@Field static final int MSG_LIST_MEDIA_RESPONSE = 63
+@Field static final int MSG_LIST_MEDIA_RESPONSE = 63 // TODO ADD MISSING INFO
 @Field static final int MSG_MEDIA_STATE_RESPONSE = 64
 @Field static final int MSG_MEDIA_COMMAND_REQUEST = 65
 @Field static final int MSG_SUBSCRIBE_BTLE_REQUEST = 66
